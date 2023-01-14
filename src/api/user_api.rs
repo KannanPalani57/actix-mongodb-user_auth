@@ -3,6 +3,7 @@ use actix_web::{
     post,
     get,
     put,
+    delete,
     web::{ Data, Json, Path },
     HttpResponse,
 };
@@ -79,3 +80,33 @@ pub async fn update_user(
         Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
      }
 }
+
+#[delete("/user/{id}")]
+pub async fn delete_user(db: Data<MongoRepo>, path: Path<String>) -> HttpResponse {
+    let id = path.into_inner();
+    if id.is_empty(){
+        return HttpResponse::BadRequest().body("Invalid ID");
+    }
+
+    let result = db.delete_user(&id).await;
+    match result {
+        Ok(res) => {
+            if res.deleted_count == 1 {
+                return HttpResponse::Ok().json("User successfully deleted!");
+            }else {
+                return HttpResponse::NotFound().json("User with specified ID not found!");
+            }
+        },
+        Err(err) => HttpResponse::InternalServerError().body(err.to_string())
+    }
+}
+
+#[get("/users")]
+pub async fn get_all_users(db: Data<MongoRepo>) -> HttpResponse {
+    let users = db.get_all_users().await;
+
+    match users {
+        Ok(users) => HttpResponse::Ok().json(users),
+        Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
+    }
+} 

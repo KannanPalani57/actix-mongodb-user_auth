@@ -4,9 +4,11 @@ use dotenv::dotenv;
 
 use mongodb::{
     bson::{extjson::de::Error, oid::ObjectId, doc} ,
-    results::{ InsertOneResult, UpdateResult},
+    results::{ InsertOneResult, UpdateResult, DeleteResult},
     Client, Collection
 };
+
+use futures::stream::TryStreamExt;
 
 use crate::models::user_model::User;
 
@@ -50,6 +52,7 @@ impl MongoRepo {
             .await.ok().expect("Error getting user's details");
 
         Ok(user_detail.unwrap())
+    
     }
 
     pub async fn update_user(&self, id: &String, new_user: User) -> Result<UpdateResult, Error>{
@@ -69,5 +72,29 @@ impl MongoRepo {
             .expect("Error updating user");
 
         Ok(update_doc)
+    }
+
+    pub async fn delete_user(&self, id: &String) -> Result<DeleteResult, Error>{
+        let obj_id = ObjectId::parse_str(id).unwrap();
+        let filter = doc! { "_id": obj_id };
+
+        let user_detail = self.col.delete_one(filter, None)
+        .await.ok().expect("Error deleting user");
+
+        Ok(user_detail)
+
+    }
+
+    pub async fn get_all_users(&self) -> Result<Vec<User>, Error> {
+        let mut cursors = self.col.find(None, None).await
+            .ok().expect("Error mapping through cursor");
+
+        let mut users: Vec<User> = Vec::new();
+
+        while let Some(user) = cursors.try_next().await.ok().expect("Error mapping through cursors") {
+            users.push(user)
+        }
+
+        Ok(users)
     }
 }
